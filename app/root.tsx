@@ -1,3 +1,5 @@
+import "./app.css";
+
 import {
   isRouteErrorResponse,
   Links,
@@ -6,9 +8,15 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
-
+import {
+  Checkbox,
+  ColorSchemeScript,
+  MantineProvider,
+  MultiSelect,
+  createTheme,
+  mantineHtmlProps,
+} from "@mantine/core";
 import type { Route } from "./+types/root";
-import "./app.css";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -23,17 +31,41 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
+const theme = createTheme({
+  components: {
+    MultiSelect: MultiSelect.extend({
+      defaultProps: {
+        searchable: true,
+        clearable: true,
+        renderOption({ option, checked }) {
+          return (
+            <div className="flex items-center gap-2">
+              <Checkbox.Indicator
+                size="xs"
+                checked={checked}
+                disabled={option.disabled}
+              />
+              {option.label}
+            </div>
+          );
+        },
+      },
+    }),
+  },
+});
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" {...mantineHtmlProps}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <ColorSchemeScript />
         <Meta />
         <Links />
       </head>
       <body>
-        {children}
+        <MantineProvider theme={theme}>{children}</MantineProvider>
         <ScrollRestoration />
         <Scripts />
       </body>

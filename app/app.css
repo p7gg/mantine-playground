@@ -1,15 +1,20 @@
-@import "tailwindcss";
+@layer theme, base, mantine, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "@mantine/carousel/styles.layer.css";
+@import "@mantine/charts/styles.layer.css";
+@import "@mantine/code-highlight/styles.layer.css";
+@import "@mantine/core/styles.layer.css";
+@import "@mantine/dates/styles.layer.css";
+@import "@mantine/dropzone/styles.layer.css";
+@import "@mantine/notifications/styles.layer.css";
+@import "@mantine/nprogress/styles.layer.css";
+@import "@mantine/tiptap/styles.layer.css";
+@import "@mantine/spotlight/styles.layer.css";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-}
-
-html,
-body {
-  @apply bg-white dark:bg-gray-950;
-
-  @media (prefers-color-scheme: dark) {
-    color-scheme: dark;
-  }
 }
