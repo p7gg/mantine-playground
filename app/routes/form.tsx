@@ -1,8 +1,9 @@
 import * as m from "@mantine/core";
 import { z } from "zod";
 import { createZodForm } from "~/modules/create-zod-form";
-import { NumberFormatBase } from "react-number-format";
 import React from "react";
+import { useUncontrolled } from "@mantine/hooks";
+import { RtlNumberInput } from "~/components/rtl-number-input";
 
 const Zod = createZodForm(
   z.object({
@@ -11,7 +12,10 @@ const Zod = createZodForm(
     price: z.number(),
     rememberMe: z.boolean(),
     items: z.object({ id: z.string() }).array(),
+    bar: z.string().array(),
     cliente: z.object({ id: z.string() }).nullable(),
+    date: z.date().nullable(),
+    dates: z.tuple([z.date().nullable(), z.date().nullable()]),
   })
 );
 
@@ -30,20 +34,6 @@ const ITEMS = [
   { id: "9", nome: "Item 9" },
 ];
 
-function isNumber(data: unknown): data is number {
-  return typeof data === "number" && !Number.isNaN(data);
-}
-
-function insert<T>(data: T[], index: number, value: T): T[] {
-  return [...data.slice(0, index), value, ...data.slice(index)];
-}
-
-function swap<T>(data: T[], indexA: number, indexB: number): void {
-  [data[indexA], data[indexB]] = [data[indexB], data[indexA]];
-}
-
-const prefix = "R$ ";
-
 export default function Page() {
   const form = Zod.useForm({
     defaultValues: {
@@ -53,19 +43,19 @@ export default function Page() {
       items: [],
       name: "",
       rememberMe: true,
+      bar: [],
+      date: null,
+      dates: [null, null],
     },
   });
 
   const [amount, setAmount] = React.useState<number | string>(0);
+  console.log("🚀 ~ amount:", amount);
 
   const handleItemsChange = (ids: string[]): { id: string }[] =>
     ITEMS.filter((item) => ids.includes(item.id)).map((item) => ({
       id: item.id,
     }));
-
-  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.currentTarget.select();
-  };
 
   return (
     <Zod.FormProvider {...form}>
@@ -76,7 +66,8 @@ export default function Page() {
         )}
       >
         <m.Stack p={10}>
-          {/* <Zod.NumberInput label="Age" name="age" />
+          <Zod.TextInput name="name" />
+          <Zod.NumberInput label="Age" name="age" />
 
           <Zod.Select
             clearable
@@ -84,18 +75,18 @@ export default function Page() {
             data={[{ value: "1", label: "1" }]}
           />
 
-          <Zod.SwitchGroup
+          <Zod.CheckboxGroup
             name="items"
             label="Items"
             value={(items) => items.map((i) => i.id)}
             onChange={handleItemsChange}
           >
             {ITEMS.map((item) => (
-              <m.Switch key={item.id} value={item.id} label={item.nome} />
+              <m.Checkbox key={item.id} value={item.id} label={item.nome} />
             ))}
-          </Zod.SwitchGroup> */}
+          </Zod.CheckboxGroup>
 
-          <Zod.MultiSelectWithChips
+          <Zod.MultiSelect
             clearable
             name="items"
             label="Items"
@@ -104,86 +95,25 @@ export default function Page() {
             data={ITEMS.map((item) => ({ value: item.id, label: item.nome }))}
           />
 
-          <m.NumberInput
-            allowDecimal
-            allowLeadingZeros={false}
-            allowNegative={false}
-            clampBehavior="blur"
-            fixedDecimalScale
-            decimalScale={2}
-            decimalSeparator=","
-            thousandSeparator="."
-            prefix={prefix}
-            value={amount}
-            onKeyDown={(e) => {
-              const key = e.key;
-              const keyAsNumber = Number(key);
+          <Zod.RadioGroup name="name" label="Select a name">
+            <m.Group>
+              <m.Radio value="foo" label="foo" />
+              <m.Radio value="bar" label="bar" />
+            </m.Group>
+          </Zod.RadioGroup>
 
-              if (key === "Backspace") {
-                return;
-              }
+          <Zod.NumberInput name="age" label="price" />
+          <Zod.NumberInput rtl name="price" prefix="R$ " label="Price" />
+          {/* <RtlNumberInput prefix="R$ " value={amount} onChange={setAmount} />
+          <RtlNumberInput suffix=" %" defaultValue={0} /> */}
 
-              if (isNumber(keyAsNumber)) {
-                if (typeof amount === "string") {
-                  return;
-                }
-
-                // Get the cursor position to insert the new key at this index
-                const cursorPositionIndex = e.currentTarget.selectionStart;
-                if (!isNumber(cursorPositionIndex)) {
-                  return;
-                }
-
-                // Measure the current input value info
-                const inputValue = e.currentTarget.value;
-                const lastIndex = inputValue.length;
-                const commaIndex = inputValue.indexOf(",");
-
-                // Don't do anything if the cursor is after the comma
-                if (cursorPositionIndex <= commaIndex) {
-                  return;
-                }
-
-                // Don't do anything if the cursor is not at the end
-                if (lastIndex !== cursorPositionIndex) {
-                  return;
-                }
-
-                // Convert the amount to decimal scale, remove dots and commas and split the digits
-                const currentValueDigits = amount
-                  .toFixed(2)
-                  .replace(/\D/g, "")
-                  .split("");
-
-                // shift the last digit to the left
-                swap(
-                  currentValueDigits,
-                  currentValueDigits.length,
-                  currentValueDigits.length - 1
-                );
-
-                // replace last digit with the pressed key
-                const newValueDigits = insert(
-                  currentValueDigits,
-                  currentValueDigits.length,
-                  key
-                );
-
-                // Convert it back to number
-                const newValue = Number(newValueDigits.join("")) / 100;
-                if (isNumber(newValue)) {
-                  setAmount(newValue);
-                }
-              }
-            }}
-            onChange={setAmount}
-          />
+          <Zod.DateRangePicker name="dates" />
 
           {/* <CurrencyInput value={amount} onChange={setAmount} /> */}
 
-          {/* <Zod.Switch name="rememberMe" />
+          {/* <Zod.Switch name="rememberMe" />*/}
 
-          <m.Button type="submit">Save</m.Button> */}
+          <m.Button type="submit">Save</m.Button>
         </m.Stack>
       </form>
     </Zod.FormProvider>

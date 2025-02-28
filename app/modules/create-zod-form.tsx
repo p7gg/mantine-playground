@@ -1,21 +1,20 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMergedRef } from "@mantine/hooks";
+import { DatePickerInput, type DatePickerInputProps } from "@mantine/dates";
 import * as m from "@mantine/core";
 import React from "react";
 import { z } from "zod";
-import { MultiSelectWithChips as BaseMultiSelectWithChips } from "~/components/multi-select-with-chips";
+import { MultiSelectWithChips } from "~/components/multi-select-with-chips";
 import * as rhf from "react-hook-form";
+import { RtlNumberInput } from "~/components/rtl-number-input";
 
-export function createZodForm<TSchema extends z.ZodType>(
+type SchemaOptions = Parameters<typeof zodResolver>[1];
+type ResolverOptions = Parameters<typeof zodResolver>[2];
+
+export function createZodForm<TSchema extends z.ZodObject<any>>(
   schema: TSchema,
-  schemaOptions?: Partial<z.ParseParams>,
-  {
-    raw = true,
-    mode,
-  }: {
-    mode?: "async" | "sync";
-    raw?: boolean;
-  } = {}
+  schemaOptions?: SchemaOptions,
+  { raw = true, mode }: ResolverOptions = {}
 ) {
   type FormInput = TSchema["_input"];
   type FormOutput = TSchema["_output"];
@@ -99,39 +98,39 @@ export function createZodForm<TSchema extends z.ZodType>(
 
   const FormProvider = rhf.FormProvider<FormInput, FormContext, FormOutput>;
 
-  type Control = rhf.Control<FormInput>;
-  type ControlledKeys = "value" | keyof rhf.UseControllerProps<FormInput, any>;
-  type Rules<TFieldName extends rhf.FieldPath<FormInput>> = Omit<
-    rhf.RegisterOptions<FormInput, TFieldName>,
-    "disabled" | "valueAsNumber" | "valueAsDate" | "setValueAs"
-  >;
-  type ZodControllerValue<T> = T extends Array<string>
+  type ControlledKeys = keyof UseControllerProps | "value" | "onChange";
+  interface UseControllerProps<
+    TName extends rhf.FieldPath<FormInput> = rhf.FieldPath<FormInput>
+  > extends rhf.UseControllerProps<FormInput, TName> {}
+
+  type ArrayValueProps<T extends Array<any>> = T extends Array<string>
     ? {
-        value?: T;
-        onChange?: (value: T) => void;
+        value?: never;
+        onChange?: (value: T) => void | T;
       }
-    : T extends Array<any>
-    ? {
+    : {
         value: (value: T) => Array<string>;
         onChange: (value: Array<string>) => T;
-      }
-    : never;
+      };
+  type RecordValueProps<T extends string | Record<string, any>> =
+    T extends string
+      ? {
+          value?: never;
+          onChange?: (value: T) => void | T;
+        }
+      : {
+          value: (value: T) => string | null;
+          onChange: (value: string | null) => T;
+        };
 
   interface TextInputProps<
-    TFieldName extends rhf.FieldPathByValue<FormInput, string>
-  > extends Omit<m.TextInputProps, ControlledKeys> {
-    ref?: React.Ref<HTMLInputElement>;
-
-    name: TFieldName;
-    control?: Control;
-    defaultValue?: rhf.FieldPathValue<FormInput, TFieldName>;
-    shouldUnregister?: boolean;
-    disabled?: boolean;
-    rules?: Rules<TFieldName>;
+    TName extends rhf.FieldPathByValue<FormInput, string>,
+    TValue = rhf.FieldPathValue<FormInput, TName>
+  > extends Omit<React.ComponentProps<typeof m.TextInput>, ControlledKeys>,
+      UseControllerProps<TName> {
+    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => TValue | void;
   }
-  function TextInput<
-    TFieldName extends rhf.FieldPathByValue<FormInput, string>
-  >({
+  function TextInput<TName extends rhf.FieldPathByValue<FormInput, string>>({
     control,
     name,
     defaultValue,
@@ -139,7 +138,7 @@ export function createZodForm<TSchema extends z.ZodType>(
     shouldUnregister,
     disabled,
     ...props
-  }: TextInputProps<TFieldName>) {
+  }: TextInputProps<TName>) {
     return (
       <Controller
         control={control}
@@ -154,18 +153,18 @@ export function createZodForm<TSchema extends z.ZodType>(
             <m.TextInput
               ref={mergeRef}
               name={field.name}
-              value={field.value}
+              value={field.value ?? ""}
               disabled={field.disabled}
               error={fieldState.error?.message}
+              {...props}
               onChange={(e) => {
-                field.onChange(e);
-                props.onChange?.(e);
+                const _ = props.onChange?.(e);
+                field.onChange(_ !== undefined ? _ : e);
               }}
               onBlur={(e) => {
                 field.onBlur();
                 props.onBlur?.(e);
               }}
-              {...props}
             />
           );
         }}
@@ -173,35 +172,33 @@ export function createZodForm<TSchema extends z.ZodType>(
     );
   }
 
-  type NumberInputProps<
-    TFieldName extends rhf.FieldPathByValue<FormInput, number>
-  > = Omit<m.NumberInputProps, ControlledKeys> & {
-    ref?: React.Ref<HTMLInputElement>;
-
-    name: TFieldName;
-    control?: Control;
-    defaultValue?: rhf.FieldPathValue<FormInput, TFieldName> | "";
-    shouldUnregister?: boolean;
-    disabled?: boolean;
-    rules?: Rules<TFieldName>;
-  };
-  function NumberInput<
-    TFieldName extends rhf.FieldPathByValue<FormInput, number>
-  >({
+  interface NumberInputProps<
+    TName extends rhf.FieldPathByValue<FormInput, number>,
+    TValue = rhf.FieldPathValue<FormInput, TName>
+  > extends Omit<React.ComponentProps<typeof m.NumberInput>, ControlledKeys>,
+      Omit<UseControllerProps<TName>, "defaultValue"> {
+    rtl?: true;
+    defaultValue?: rhf.FieldPathValue<FormInput, TName> | "";
+    onChange?: (value: string | number) => void | TValue;
+  }
+  function NumberInput<TName extends rhf.FieldPathByValue<FormInput, number>>({
     control,
     name,
     defaultValue,
     rules,
     shouldUnregister,
     disabled,
+    rtl,
     ...props
-  }: NumberInputProps<TFieldName>) {
+  }: NumberInputProps<TName>) {
+    const NumberInput = rtl ? RtlNumberInput : m.NumberInput;
+
     return (
       <Controller
         control={control}
         name={name}
         defaultValue={
-          defaultValue as rhf.FieldPathValue<FormInput, TFieldName> | undefined
+          defaultValue as rhf.FieldPathValue<FormInput, TName> | undefined
         }
         rules={rules}
         shouldUnregister={shouldUnregister}
@@ -209,21 +206,21 @@ export function createZodForm<TSchema extends z.ZodType>(
         render={({ field, fieldState }) => {
           const mergeRef = useMergedRef(field.ref, props.ref);
           return (
-            <m.NumberInput
+            <NumberInput
               ref={mergeRef}
               name={field.name}
-              value={field.value}
+              value={field.value ?? ""}
               disabled={field.disabled}
               error={fieldState.error?.message}
+              {...props}
               onChange={(e) => {
-                field.onChange(e);
-                props.onChange?.(e);
+                const _ = props.onChange?.(e);
+                field.onChange(_ !== undefined ? _ : e);
               }}
               onBlur={(e) => {
                 field.onBlur();
                 props.onBlur?.(e);
               }}
-              {...props}
             />
           );
         }}
@@ -231,20 +228,14 @@ export function createZodForm<TSchema extends z.ZodType>(
     );
   }
 
-  type CheckboxProps<
-    TFieldName extends rhf.FieldPathByValue<FormInput, boolean>
-  > = Omit<m.CheckboxProps, ControlledKeys> & {
-    ref?: React.Ref<HTMLInputElement>;
-    name: TFieldName;
-    defaultValue?: rhf.FieldPathValue<FormInput, TFieldName>;
-    control?: Control;
-    shouldUnregister?: boolean;
-    disabled?: boolean;
-    rules?: Rules<TFieldName>;
-  };
-  function Checkbox<
-    TFieldName extends rhf.FieldPathByValue<FormInput, boolean>
-  >({
+  interface CheckboxProps<
+    TName extends rhf.FieldPathByValue<FormInput, boolean>,
+    TValue = rhf.FieldPathValue<FormInput, TName>
+  > extends Omit<React.ComponentProps<typeof m.Checkbox>, ControlledKeys>,
+      UseControllerProps<TName> {
+    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void | TValue;
+  }
+  function Checkbox<TName extends rhf.FieldPathByValue<FormInput, boolean>>({
     control,
     name,
     defaultValue,
@@ -252,7 +243,7 @@ export function createZodForm<TSchema extends z.ZodType>(
     shouldUnregister,
     disabled,
     ...props
-  }: CheckboxProps<TFieldName>) {
+  }: CheckboxProps<TName>) {
     return (
       <Controller
         control={control}
@@ -267,18 +258,18 @@ export function createZodForm<TSchema extends z.ZodType>(
             <m.Checkbox
               ref={mergeRef}
               name={field.name}
-              checked={field.value}
+              checked={field.value ?? false}
               disabled={field.disabled}
               error={fieldState.error?.message}
+              {...props}
               onChange={(e) => {
-                field.onChange(e);
-                props.onChange?.(e);
+                const _ = props.onChange?.(e);
+                field.onChange(_ !== undefined ? _ : e);
               }}
               onBlur={(e) => {
                 field.onBlur();
                 props.onBlur?.(e);
               }}
-              {...props}
             />
           );
         }}
@@ -287,17 +278,10 @@ export function createZodForm<TSchema extends z.ZodType>(
   }
 
   type CheckboxGroupProps<
-    TFieldName extends rhf.FieldPathByValue<FormInput, Array<any>>
-  > = Omit<m.CheckboxGroupProps, ControlledKeys> &
-    ZodControllerValue<rhf.FieldPathValue<FormInput, TFieldName>> & {
-      ref?: React.Ref<HTMLInputElement>;
-      name: TFieldName;
-      defaultValue?: rhf.FieldPathValue<FormInput, TFieldName>;
-      control?: Control;
-      shouldUnregister?: boolean;
-      disabled?: boolean;
-      rules?: Rules<TFieldName>;
-    };
+    TName extends rhf.FieldPathByValue<FormInput, Array<any>>
+  > = Omit<React.ComponentProps<typeof m.CheckboxGroup>, ControlledKeys> &
+    UseControllerProps<TName> &
+    ArrayValueProps<rhf.FieldPathValue<FormInput, TName>>;
   function CheckboxGroup<
     TFieldName extends rhf.FieldPathByValue<FormInput, Array<any>>
   >({
@@ -329,15 +313,16 @@ export function createZodForm<TSchema extends z.ZodType>(
                 typeof value === "function" ? value(field.value) : field.value
               }
               error={fieldState.error?.message}
+              disabled={field.disabled}
+              {...props}
               onChange={(e) => {
                 const _ = onChange?.(e);
-                field.onChange(_ ?? e);
+                field.onChange(_ !== undefined ? _ : e);
               }}
               onBlur={(e) => {
                 field.onBlur();
                 props.onBlur?.(e);
               }}
-              {...props}
             />
           );
         }}
@@ -345,18 +330,14 @@ export function createZodForm<TSchema extends z.ZodType>(
     );
   }
 
-  type SwitchProps<
-    TFieldName extends rhf.FieldPathByValue<FormInput, boolean>
-  > = Omit<m.SwitchProps, ControlledKeys> & {
-    ref?: React.Ref<HTMLInputElement>;
-    name: TFieldName;
-    defaultValue?: rhf.FieldPathValue<FormInput, TFieldName>;
-    control?: Control;
-    shouldUnregister?: boolean;
-    disabled?: boolean;
-    rules?: Rules<TFieldName>;
-  };
-  function Switch<TFieldName extends rhf.FieldPathByValue<FormInput, boolean>>({
+  interface SwitchProps<
+    TName extends rhf.FieldPathByValue<FormInput, boolean>,
+    TValue = rhf.FieldPathValue<FormInput, TName>
+  > extends Omit<React.ComponentProps<typeof m.Switch>, ControlledKeys>,
+      UseControllerProps<TName> {
+    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void | TValue;
+  }
+  function Switch<TName extends rhf.FieldPathByValue<FormInput, boolean>>({
     control,
     name,
     defaultValue,
@@ -364,7 +345,7 @@ export function createZodForm<TSchema extends z.ZodType>(
     shouldUnregister,
     disabled,
     ...props
-  }: SwitchProps<TFieldName>) {
+  }: SwitchProps<TName>) {
     return (
       <Controller
         control={control}
@@ -379,18 +360,18 @@ export function createZodForm<TSchema extends z.ZodType>(
             <m.Switch
               ref={mergeRef}
               name={field.name}
-              checked={field.value}
+              checked={field.value ?? false}
               disabled={field.disabled}
               error={fieldState.error?.message}
+              {...props}
               onChange={(e) => {
-                field.onChange(e);
-                props.onChange?.(e);
+                const _ = props.onChange?.(e);
+                field.onChange(_ !== undefined ? _ : e);
               }}
               onBlur={(e) => {
                 field.onBlur();
                 props.onBlur?.(e);
               }}
-              {...props}
             />
           );
         }}
@@ -399,19 +380,12 @@ export function createZodForm<TSchema extends z.ZodType>(
   }
 
   type SwitchGroupProps<
-    TFieldName extends rhf.FieldPathByValue<FormInput, Array<any>>
-  > = Omit<m.SwitchGroupProps, ControlledKeys> &
-    ZodControllerValue<rhf.FieldPathValue<FormInput, TFieldName>> & {
-      ref?: React.Ref<HTMLInputElement>;
-      name: TFieldName;
-      defaultValue?: rhf.FieldPathValue<FormInput, TFieldName>;
-      control?: Control;
-      shouldUnregister?: boolean;
-      disabled?: boolean;
-      rules?: Rules<TFieldName>;
-    };
+    TName extends rhf.FieldPathByValue<FormInput, Array<any>>
+  > = Omit<React.ComponentProps<typeof m.SwitchGroup>, ControlledKeys> &
+    UseControllerProps<TName> &
+    ArrayValueProps<rhf.FieldPathValue<FormInput, TName>>;
   function SwitchGroup<
-    TFieldName extends rhf.FieldPathByValue<FormInput, Array<any>>
+    TName extends rhf.FieldPathByValue<FormInput, Array<any>>
   >({
     control,
     name,
@@ -423,7 +397,7 @@ export function createZodForm<TSchema extends z.ZodType>(
     value,
     onChange,
     ...props
-  }: SwitchGroupProps<TFieldName>) {
+  }: SwitchGroupProps<TName>) {
     return (
       <Controller
         control={control}
@@ -441,6 +415,8 @@ export function createZodForm<TSchema extends z.ZodType>(
                 typeof value === "function" ? value(field.value) : field.value
               }
               error={fieldState.error?.message}
+              disabled={field.disabled}
+              {...props}
               onChange={(e) => {
                 const _ = onChange?.(e);
                 field.onChange(_ ?? e);
@@ -449,7 +425,103 @@ export function createZodForm<TSchema extends z.ZodType>(
                 field.onBlur();
                 props.onBlur?.(e);
               }}
+            />
+          );
+        }}
+      />
+    );
+  }
+
+  interface RadioProps<
+    TName extends rhf.FieldPathByValue<FormInput, boolean>,
+    TValue = rhf.FieldPathValue<FormInput, TName>
+  > extends Omit<React.ComponentProps<typeof m.Radio>, ControlledKeys>,
+      UseControllerProps<TName> {
+    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void | TValue;
+  }
+  function Radio<TName extends rhf.FieldPathByValue<FormInput, boolean>>({
+    control,
+    name,
+    defaultValue,
+    rules,
+    shouldUnregister,
+    disabled,
+    ...props
+  }: RadioProps<TName>) {
+    return (
+      <Controller
+        control={control}
+        name={name}
+        defaultValue={defaultValue}
+        rules={rules}
+        shouldUnregister={shouldUnregister}
+        disabled={disabled}
+        render={({ field, fieldState }) => {
+          const mergeRef = useMergedRef(field.ref, props.ref);
+          return (
+            <m.Radio
+              ref={mergeRef}
+              name={field.name}
+              checked={field.value ?? false}
+              disabled={field.disabled}
+              error={fieldState.error?.message}
               {...props}
+              onChange={(e) => {
+                const _ = props.onChange?.(e);
+                field.onChange(_ !== undefined ? _ : e);
+              }}
+              onBlur={(e) => {
+                field.onBlur();
+                props.onBlur?.(e);
+              }}
+            />
+          );
+        }}
+      />
+    );
+  }
+
+  interface RadioGroupProps<
+    TName extends rhf.FieldPathByValue<FormInput, string>,
+    TValue = rhf.FieldPathValue<FormInput, TName>
+  > extends Omit<React.ComponentProps<typeof m.RadioGroup>, ControlledKeys>,
+      UseControllerProps<TName> {
+    onChange?: (value: string) => void | TValue;
+  }
+  function RadioGroup<TName extends rhf.FieldPathByValue<FormInput, string>>({
+    control,
+    name,
+    defaultValue,
+    rules,
+    shouldUnregister,
+    disabled,
+    ...props
+  }: RadioGroupProps<TName>) {
+    return (
+      <Controller
+        control={control}
+        name={name}
+        defaultValue={defaultValue}
+        rules={rules}
+        shouldUnregister={shouldUnregister}
+        disabled={disabled}
+        render={({ field, fieldState }) => {
+          const mergeRef = useMergedRef(field.ref, props.ref);
+          return (
+            <m.Radio.Group
+              ref={mergeRef}
+              name={field.name}
+              value={field.value}
+              error={fieldState.error?.message}
+              {...props}
+              onChange={(e) => {
+                const _ = props.onChange?.(e);
+                field.onChange(_ !== undefined ? _ : e);
+              }}
+              onBlur={(e) => {
+                field.onBlur();
+                props.onBlur?.(e);
+              }}
             />
           );
         }}
@@ -458,33 +530,17 @@ export function createZodForm<TSchema extends z.ZodType>(
   }
 
   type SelectProps<
-    TFieldName extends rhf.FieldPathByValue<
+    TName extends rhf.FieldPathByValue<
       FormInput,
-      string | Record<string, any>
+      string | (Record<string, any> | null)
     >
-  > = Omit<m.SelectProps, ControlledKeys | "onChange"> &
-    (rhf.FieldPathValue<FormInput, TFieldName> extends string
-      ? { value?: never; onChange?: (value: string | null) => void }
-      : {
-          value: (
-            value: rhf.FieldPathValue<FormInput, TFieldName>
-          ) => string | null;
-          onChange: (
-            value: string | null
-          ) => rhf.FieldPathValue<FormInput, TFieldName>;
-        }) & {
-      ref?: React.Ref<HTMLInputElement>;
-      name: TFieldName;
-      defaultValue?: rhf.FieldPathValue<FormInput, TFieldName> | null;
-      control?: Control;
-      shouldUnregister?: boolean;
-      disabled?: boolean;
-      rules?: Rules<TFieldName>;
-    };
+  > = Omit<React.ComponentProps<typeof m.Select>, ControlledKeys> &
+    UseControllerProps<TName> &
+    RecordValueProps<rhf.FieldPathValue<FormInput, TName>>;
   function Select<
-    TFieldName extends rhf.FieldPathByValue<
+    TName extends rhf.FieldPathByValue<
       FormInput,
-      string | Record<string, any>
+      string | (Record<string, any> | null)
     >
   >({
     control,
@@ -497,12 +553,12 @@ export function createZodForm<TSchema extends z.ZodType>(
     value,
     onChange,
     ...props
-  }: SelectProps<TFieldName>) {
+  }: SelectProps<TName>) {
     return (
       <Controller
         control={control}
         name={name}
-        defaultValue={defaultValue as rhf.FieldPathValue<FormInput, TFieldName>}
+        defaultValue={defaultValue as rhf.FieldPathValue<FormInput, TName>}
         rules={rules}
         shouldUnregister={shouldUnregister}
         disabled={disabled}
@@ -511,10 +567,13 @@ export function createZodForm<TSchema extends z.ZodType>(
           return (
             <m.Select
               ref={mergeRef}
+              name={field.name}
               value={
                 typeof value === "function" ? value(field.value) : field.value
               }
               error={fieldState.error?.message}
+              disabled={field.disabled}
+              {...props}
               onChange={(e) => {
                 const _ = onChange?.(e);
                 field.onChange(_ ?? e);
@@ -523,7 +582,6 @@ export function createZodForm<TSchema extends z.ZodType>(
                 field.onBlur();
                 props.onBlur?.(e);
               }}
-              {...props}
             />
           );
         }}
@@ -532,19 +590,12 @@ export function createZodForm<TSchema extends z.ZodType>(
   }
 
   type MultiSelectProps<
-    TFieldName extends rhf.FieldPathByValue<FormInput, Array<any>>
-  > = Omit<m.MultiSelectProps, ControlledKeys> &
-    ZodControllerValue<rhf.FieldPathValue<FormInput, TFieldName>> & {
-      ref?: React.Ref<HTMLInputElement>;
-      name: TFieldName;
-      defaultValue?: rhf.FieldPathValue<FormInput, TFieldName>;
-      control?: Control;
-      shouldUnregister?: boolean;
-      disabled?: boolean;
-      rules?: Rules<TFieldName>;
-    };
+    TName extends rhf.FieldPathByValue<FormInput, Array<any>>
+  > = Omit<React.ComponentProps<typeof MultiSelectWithChips>, ControlledKeys> &
+    UseControllerProps<TName> &
+    ArrayValueProps<rhf.FieldPathValue<FormInput, TName>>;
   function MultiSelect<
-    TFieldName extends rhf.FieldPathByValue<FormInput, Array<any>>
+    TName extends rhf.FieldPathByValue<FormInput, Array<any>>
   >({
     control,
     name,
@@ -556,7 +607,7 @@ export function createZodForm<TSchema extends z.ZodType>(
     value,
     onChange,
     ...props
-  }: MultiSelectProps<TFieldName>) {
+  }: MultiSelectProps<TName>) {
     return (
       <Controller
         control={control}
@@ -568,12 +619,15 @@ export function createZodForm<TSchema extends z.ZodType>(
         render={({ field, fieldState }) => {
           const mergeRef = useMergedRef(field.ref, props.ref);
           return (
-            <m.MultiSelect
+            <MultiSelectWithChips
               ref={mergeRef}
+              name={field.name}
               value={
                 typeof value === "function" ? value(field.value) : field.value
               }
               error={fieldState.error?.message}
+              disabled={field.disabled}
+              {...props}
               onChange={(e) => {
                 const _ = onChange?.(e);
                 field.onChange(_ ?? e);
@@ -582,7 +636,6 @@ export function createZodForm<TSchema extends z.ZodType>(
                 field.onBlur();
                 props.onBlur?.(e);
               }}
-              {...props}
             />
           );
         }}
@@ -590,20 +643,16 @@ export function createZodForm<TSchema extends z.ZodType>(
     );
   }
 
-  type MultiSelectWithChipsProps<
-    TFieldName extends rhf.FieldPathByValue<FormInput, Array<any>>
-  > = Omit<m.MultiSelectProps, ControlledKeys> &
-    ZodControllerValue<rhf.FieldPathValue<FormInput, TFieldName>> & {
-      ref?: React.Ref<HTMLInputElement>;
-      name: TFieldName;
-      defaultValue?: rhf.FieldPathValue<FormInput, TFieldName>;
-      control?: Control;
-      shouldUnregister?: boolean;
-      disabled?: boolean;
-      rules?: Rules<TFieldName>;
-    };
-  function MultiSelectWithChips<
-    TFieldName extends rhf.FieldPathByValue<FormInput, Array<any>>
+  interface DatePickerProps<
+    TName extends rhf.FieldPathByValue<FormInput, Date | null>,
+    TValue = rhf.FieldPathValue<FormInput, TName>
+  > extends Omit<DatePickerInputProps<"default">, ControlledKeys | "type">,
+      UseControllerProps<TName> {
+    ref?: React.Ref<HTMLButtonElement>;
+    onChange?: (value: Date | null) => void | TValue;
+  }
+  function DatePicker<
+    TName extends rhf.FieldPathByValue<FormInput, Date | null>
   >({
     control,
     name,
@@ -611,11 +660,8 @@ export function createZodForm<TSchema extends z.ZodType>(
     rules,
     shouldUnregister,
     disabled,
-
-    value,
-    onChange,
     ...props
-  }: MultiSelectProps<TFieldName>) {
+  }: DatePickerProps<TName>) {
     return (
       <Controller
         control={control}
@@ -625,23 +671,71 @@ export function createZodForm<TSchema extends z.ZodType>(
         shouldUnregister={shouldUnregister}
         disabled={disabled}
         render={({ field, fieldState }) => {
-          const mergeRef = useMergedRef(field.ref, props.ref);
+          const mergedRef = useMergedRef(field.ref, props.ref);
           return (
-            <BaseMultiSelectWithChips
-              ref={mergeRef}
-              value={
-                typeof value === "function" ? value(field.value) : field.value
-              }
+            <DatePickerInput
+              type="default"
+              ref={mergedRef}
+              name={field.name}
+              value={field.value ?? null}
               error={fieldState.error?.message}
-              onChange={(e) => {
-                const _ = onChange?.(e);
-                field.onChange(_ ?? e);
-              }}
-              onBlur={(e) => {
-                field.onBlur();
-                props.onBlur?.(e);
-              }}
+              disabled={field.disabled}
               {...props}
+              onChange={(e) => {
+                const _ = props.onChange?.(e);
+                field.onChange(_ !== undefined ? _ : e);
+              }}
+              onBlur={field.onBlur}
+            />
+          );
+        }}
+      />
+    );
+  }
+
+  interface DateRangePickerProps<
+    TName extends rhf.FieldPathByValue<FormInput, [Date | null, Date | null]>,
+    TValue = rhf.FieldPathValue<FormInput, TName>
+  > extends Omit<DatePickerInputProps<"range">, ControlledKeys | "type">,
+      UseControllerProps<TName> {
+    ref?: React.Ref<HTMLButtonElement>;
+    onChange?: (value: [Date | null, Date | null]) => void | TValue;
+  }
+  function DateRangePicker<
+    TName extends rhf.FieldPathByValue<FormInput, [Date | null, Date | null]>
+  >({
+    control,
+    name,
+    defaultValue,
+    rules,
+    shouldUnregister,
+    disabled,
+    ...props
+  }: DateRangePickerProps<TName>) {
+    return (
+      <Controller
+        control={control}
+        name={name}
+        defaultValue={defaultValue}
+        rules={rules}
+        shouldUnregister={shouldUnregister}
+        disabled={disabled}
+        render={({ field, fieldState }) => {
+          const mergedRef = useMergedRef(field.ref, props.ref);
+          return (
+            <DatePickerInput
+              type="range"
+              ref={mergedRef}
+              name={field.name}
+              value={[field.value[0] ?? null, field.value[1] ?? null]}
+              error={fieldState.error?.message}
+              disabled={field.disabled}
+              {...props}
+              onChange={(e) => {
+                const _ = props.onChange?.(e);
+                field.onChange(_ !== undefined ? _ : e);
+              }}
+              onBlur={field.onBlur}
             />
           );
         }}
@@ -664,10 +758,13 @@ export function createZodForm<TSchema extends z.ZodType>(
     CheckboxGroup,
     Switch,
     SwitchGroup,
+    Radio,
+    RadioGroup,
     Select,
     MultiSelect,
-    MultiSelectWithChips,
-    _input: undefined as FormInput,
-    _output: undefined as FormOutput,
+    DatePicker,
+    DateRangePicker,
+    _input: undefined as unknown as FormInput,
+    _output: undefined as unknown as FormOutput,
   };
 }

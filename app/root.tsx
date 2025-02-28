@@ -10,9 +10,11 @@ import {
 } from "react-router";
 import {
   Checkbox,
+  Chip,
   ColorSchemeScript,
   MantineProvider,
   MultiSelect,
+  Tooltip,
   createTheme,
   mantineHtmlProps,
 } from "@mantine/core";
@@ -33,6 +35,21 @@ export const links: Route.LinksFunction = () => [
 
 const theme = createTheme({
   components: {
+    Tooltip: Tooltip.extend({
+      classNames: {
+        tooltip: "text-balance",
+      },
+      defaultProps: {
+        multiline: true,
+        maw: 250,
+      },
+    }),
+    Chip: Chip.extend({
+      classNames: {
+        label:
+          "[&>span:nth-of-type(2)]:break-all [&>span:nth-of-type(2)]:whitespace-break-spaces",
+      },
+    }),
     MultiSelect: MultiSelect.extend({
       defaultProps: {
         searchable: true,

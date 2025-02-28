@@ -1,19 +1,18 @@
-import {
-  Chip,
-  MultiSelect,
-  Tooltip,
-  type ComboboxItem,
-  type MultiSelectProps,
-} from "@mantine/core";
+import { Chip, MultiSelect, Tooltip, type ComboboxItem } from "@mantine/core";
 import { useUncontrolled } from "@mantine/hooks";
 
+interface MultiSelectWithChips
+  extends React.ComponentProps<typeof MultiSelect> {
+  hideList?: boolean;
+}
 export function MultiSelectWithChips({
   classNames,
   defaultValue,
   value,
   onChange,
+  hideList,
   ...props
-}: MultiSelectProps) {
+}: MultiSelectWithChips) {
   const [_value, setValue] = useUncontrolled({
     defaultValue,
     value,
@@ -23,23 +22,25 @@ export function MultiSelectWithChips({
 
   const chipsOptions: Array<ComboboxItem> = [];
 
-  for (const item of props.data ?? []) {
-    if (typeof item === "string") {
-      chipsOptions.push({ value: item, label: item });
-      continue;
-    }
-
-    if ("group" in item) {
-      for (const subItem of item.items) {
-        const value = typeof subItem === "string" ? subItem : subItem.value;
-        chipsOptions.push(
-          typeof subItem === "string" ? { value, label: value } : subItem
-        );
+  if (!hideList) {
+    for (const item of props.data ?? []) {
+      if (typeof item === "string") {
+        chipsOptions.push({ value: item, label: item });
+        continue;
       }
-      continue;
-    }
 
-    chipsOptions.push(item);
+      if ("group" in item) {
+        for (const subItem of item.items) {
+          const value = typeof subItem === "string" ? subItem : subItem.value;
+          chipsOptions.push(
+            typeof subItem === "string" ? { value, label: value } : subItem
+          );
+        }
+        continue;
+      }
+
+      chipsOptions.push(item);
+    }
   }
 
   const isAllChecked =
@@ -50,14 +51,25 @@ export function MultiSelectWithChips({
     setValue(checked ? chipsOptions.map((chip) => chip.value) : []);
   };
 
+  const multiSelect = (
+    <MultiSelect
+      value={_value}
+      onChange={setValue}
+      classNames={{
+        ...classNames,
+        ...(!hideList && { pill: "hidden" }),
+      }}
+      {...props}
+    />
+  );
+
+  if (hideList) {
+    return multiSelect;
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      <MultiSelect
-        value={_value}
-        onChange={setValue}
-        classNames={{ ...classNames, pill: "hidden" }}
-        {...props}
-      />
+      {multiSelect}
 
       <div className="flex flex-wrap items-center gap-2">
         <Chip
@@ -80,9 +92,6 @@ export function MultiSelectWithChips({
                 refProp="rootRef"
                 label={option.label}
                 openDelay={500}
-                maw={200}
-                multiline
-                className="text-balance"
                 withArrow
               >
                 <Chip
@@ -93,8 +102,7 @@ export function MultiSelectWithChips({
                   maw={200}
                   classNames={{
                     iconWrapper: "hidden",
-                    label:
-                      "px-2 [&>span:nth-of-type(2)]:line-clamp-1 [&>span:nth-of-type(2)]:break-all [&>span:nth-of-type(2)]:whitespace-break-spaces",
+                    label: "px-2 [&>span:nth-of-type(2)]:line-clamp-1",
                   }}
                 >
                   {option.label}
